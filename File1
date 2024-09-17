@@ -1,0 +1,4 @@
+mkdir QRCodeAttend
+cd QRCodeAttend
+npm init -y
+npm install express mongoose body-parser qrcode
