@@ -1,0 +1,60 @@
+const express = require('express');
+const mongoose = require('mongoose');
+const bodyParser = require('body-parser');
+const QRCode = require('qrcode');
+
+const app = express();
+app.use(bodyParser.json());
+
+mongoose.connect('mongodb://localhost:27017/qrcodeattend', {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+});
+
+const UserSchema = new mongoose.Schema({
+    name: String,
+    email: String,
+});
+
+const AttendanceSchema = new mongoose.Schema({
+    userId: mongoose.Schema.Types.ObjectId,
+    event: String,
+    date: { type: Date, default: Date.now },
+});
+
+const User = mongoose.model('User', UserSchema);
+const Attendance = mongoose.model('Attendance', AttendanceSchema);
+
+// Generate QR Code for user
+app.get('/generate-qr/:userId', async (req, res) => {
+    try {
+        const user = await User.findById(req.params.userId);
+        if (!user) return res.status(404).send('User not found');
+        
+        const qrData = JSON.stringify({ userId: user._id });
+        QRCode.toDataURL(qrData, (err, url) => {
+            if (err) return res.status(500).send('Error generating QR code');
+            res.send(`<img src="${url}">`);
+        });
+    } catch (err) {
+        res.status(500).send('Server Error');
+    }
+});
+
+// Mark attendance by scanning QR code
+app.post('/mark-attendance', async (req, res) => {
+    try {
+        const { qrData, event } = req.body;
+        const { userId } = JSON.parse(qrData);
+
+        const attendance = new Attendance({ userId, event });
+        await attendance.save();
+
+        res.send('Attendance marked successfully');
+    } catch (err) {
+        res.status(500).send('Server Error');
+    }
+});
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
